@@ -1,0 +1,82 @@
+name: Deploy Ordem Servico Authorizer
+
+on:
+  workflow_call:
+    secrets:
+      AUTH_ACTION_ROLE:
+        required: true
+      REPOSITORIES_TOKEN:
+        required: false
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  DOTNET_VERSION: 10.0.x
+  SOLUTION_FILE: ./FiapTechChallengeServerless.slnx
+  FUNCTION_PROJECT: ./src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.csproj
+  FUNCTION_NAME: fiap-ordem-servico-authorizer
+  PUBLISH_DIR: ./artifacts/publish
+  PACKAGE_PATH: ./artifacts/ordem-servico-authorizer.zip
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: serverless-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, Test And Deploy Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do Serverless
+        uses: actions/checkout@v4
+        with:
+          repository: Maieru/fiap-tech-challenge-serverless
+          token: ${{ secrets.REPOSITORIES_TOKEN || github.token }}
+
+      - name: Configurar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restaurar dependencias
+        run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+      - name: Compilar solucao
+        run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+      - name: Executar testes
+        run: dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity normal
+
+      - name: Publicar Lambda
+        run: dotnet publish ${{ env.FUNCTION_PROJECT }} --configuration Release --no-build --output ${{ env.PUBLISH_DIR }}
+
+      - name: Empacotar Lambda
+        working-directory: ${{ env.PUBLISH_DIR }}
+        run: zip -q -r ../ordem-servico-authorizer.zip .
+
+      - name: Configurar credenciais AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AUTH_ACTION_ROLE }}
+
+      - name: Atualizar codigo da Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "${FUNCTION_NAME}" \
+            --zip-file "fileb://${PACKAGE_PATH}" \
+            --no-cli-pager
+
+          aws lambda wait function-updated \
+            --function-name "${FUNCTION_NAME}"
+
+      - name: Exibir versao implantada
+        run: |
+          aws lambda get-function-configuration \
+            --function-name "${FUNCTION_NAME}" \
+            --query '{FunctionName:FunctionName,LastModified:LastModified,CodeSha256:CodeSha256,State:State}'

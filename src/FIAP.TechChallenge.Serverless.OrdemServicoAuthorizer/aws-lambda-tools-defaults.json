@@ -1,0 +1,12 @@
+{
+  "Information": [
+    "Defaults used by the AWS Lambda .NET CLI commands."
+  ],
+  "profile": "default",
+  "region": "us-east-1",
+  "configuration": "Release",
+  "function-runtime": "dotnet10",
+  "function-memory-size": 256,
+  "function-timeout": 10,
+  "function-handler": "Ftc.Authorizer::FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Function::FunctionHandler"
+}

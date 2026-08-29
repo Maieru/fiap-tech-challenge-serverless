@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Tests/">
+    <Project Path="tests/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Tests/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Tests.csproj" />
+  </Folder>
+  <Project Path="src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.csproj" />
+</Solution>
