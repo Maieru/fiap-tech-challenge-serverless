@@ -8,5 +8,5 @@
   "function-runtime": "dotnet10",
   "function-memory-size": 256,
   "function-timeout": 10,
-  "function-handler": "FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer::FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Function::FunctionHandler"
+  "function-handler": "Ftc.Authorizer::FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Function::FunctionHandler"
 }

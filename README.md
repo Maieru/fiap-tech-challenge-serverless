@@ -69,5 +69,46 @@ dotnet lambda package `
 O handler configurado e:
 
 ```text
-FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer::FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Function::FunctionHandler
+Ftc.Authorizer::FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Function::FunctionHandler
 ```
+
+## Infraestrutura AWS
+
+O Terraform e seu estado ficam no repositorio `fiap-tech-challenge-infra`, no
+estagio `infra/serverless`. O repositorio de infraestrutura provisiona:
+
+- Lambda .NET 10 nas subnets privadas;
+- role de execucao e acesso somente ao segredo do banco;
+- security groups para PostgreSQL e Secrets Manager;
+- endpoint VPC privado do Secrets Manager;
+- Lambda Authorizer HTTP API v2 sem cache;
+- rotas de acompanhamento, aprovacao e cancelamento protegidas por `X-CPF`.
+
+Antes do primeiro deploy, aplique os estados `aws-resources`, `database` e
+`api-gateway`, seguidos do estado `serverless`. Este repositorio nao executa
+Terraform: ele apenas compila, testa e atualiza o codigo da funcao ja existente.
+
+Para deploy local:
+
+```powershell
+dotnet test FiapTechChallengeServerless.slnx --configuration Release
+
+dotnet publish `
+  src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.csproj `
+  --configuration Release `
+  --output artifacts/publish
+
+Compress-Archive `
+  -Path artifacts/publish/* `
+  -DestinationPath artifacts/ordem-servico-authorizer.zip `
+  -Force
+
+aws lambda update-function-code `
+  --function-name fiap-ordem-servico-authorizer `
+  --zip-file fileb://artifacts/ordem-servico-authorizer.zip
+```
+
+No GitHub Actions, configure `AUTH_ACTION_ROLE` com o ARN da role
+`fiap-role-github-actions-auth`. Essa role permite somente consultar a funcao e
+atualizar seu codigo. O workflow de inicializacao provisiona a infraestrutura
+primeiro e executa o deploy do codigo em seguida.
