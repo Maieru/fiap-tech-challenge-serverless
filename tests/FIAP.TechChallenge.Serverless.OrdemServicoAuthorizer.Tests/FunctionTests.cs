@@ -1,19 +1,19 @@
 using FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Contracts;
 using FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Persistence;
-using FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.ValueObjects;
 
 namespace FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Tests;
 
 public sealed class FunctionTests
 {
     private static readonly Guid OrdemServicoId = Guid.Parse("9be8b471-bd51-4f44-a0e0-3db12cb342c3");
+    private const string AccessToken = "b5e74f864f72daddbd995596a65e6ac368aa2c362e3858f7a38dc9c01eaba471";
 
     [Test]
-    public async Task FunctionHandler_ShouldAllowRequest_WhenCpfBelongsToOrdemServico()
+    public async Task FunctionHandler_ShouldAllowRequest_WhenTokenAuthorizesOrdemServico()
     {
         var repository = new FakeOrdemServicoAccessRepository(true);
         var function = new Function(repository);
-        var request = CreateRequest("529.982.247-25", OrdemServicoId.ToString());
+        var request = CreateRequest(AccessToken, OrdemServicoId.ToString());
 
         var response = await function.FunctionHandler(request);
 
@@ -23,7 +23,7 @@ public sealed class FunctionTests
             Assert.That(response.Context["ordemServicoId"], Is.EqualTo(OrdemServicoId.ToString()));
             Assert.That(repository.CallCount, Is.EqualTo(1));
             Assert.That(repository.LastOrdemServicoId, Is.EqualTo(OrdemServicoId));
-            Assert.That(repository.LastCpf?.Value, Is.EqualTo("52998224725"));
+            Assert.That(repository.LastAccessToken, Is.EqualTo(AccessToken));
         });
     }
 
@@ -33,7 +33,7 @@ public sealed class FunctionTests
         var repository = new FakeOrdemServicoAccessRepository(false);
         var function = new Function(repository);
 
-        var response = await function.FunctionHandler(CreateRequest("52998224725", OrdemServicoId.ToString()));
+        var response = await function.FunctionHandler(CreateRequest(AccessToken, OrdemServicoId.ToString()));
 
         Assert.Multiple(() =>
         {
@@ -44,14 +44,14 @@ public sealed class FunctionTests
     }
 
     [TestCase(null)]
-    [TestCase("11111111111")]
-    [TestCase("52998224724")]
-    public async Task FunctionHandler_ShouldDenyWithoutQueryingDatabase_WhenCpfIsMissingOrInvalid(string? cpf)
+    [TestCase("token-invalido")]
+    [TestCase("b5e74f864f72daddbd995596a65e6ac368aa2c362e3858f7a38dc9c01eaba47z")]
+    public async Task FunctionHandler_ShouldDenyWithoutQueryingDatabase_WhenTokenIsMissingOrInvalid(string? token)
     {
         var repository = new FakeOrdemServicoAccessRepository(true);
         var function = new Function(repository);
 
-        var response = await function.FunctionHandler(CreateRequest(cpf, OrdemServicoId.ToString()));
+        var response = await function.FunctionHandler(CreateRequest(token, OrdemServicoId.ToString()));
 
         Assert.Multiple(() =>
         {
@@ -69,7 +69,7 @@ public sealed class FunctionTests
         var repository = new FakeOrdemServicoAccessRepository(true);
         var function = new Function(repository);
 
-        var response = await function.FunctionHandler(CreateRequest("52998224725", id));
+        var response = await function.FunctionHandler(CreateRequest(AccessToken, id));
 
         Assert.Multiple(() =>
         {
@@ -79,13 +79,13 @@ public sealed class FunctionTests
     }
 
     [Test]
-    public async Task FunctionHandler_ShouldReadCpfHeaderCaseInsensitively()
+    public async Task FunctionHandler_ShouldReadPathParameterNameCaseInsensitively()
     {
         var repository = new FakeOrdemServicoAccessRepository(true);
         var function = new Function(repository);
         var request = new HttpApiAuthorizerRequest
         {
-            Headers = new Dictionary<string, string> { ["X-CPF"] = "52998224725" },
+            QueryStringParameters = new Dictionary<string, string> { ["token"] = AccessToken },
             PathParameters = new Dictionary<string, string> { ["ID"] = OrdemServicoId.ToString() }
         };
 
@@ -98,13 +98,13 @@ public sealed class FunctionTests
         });
     }
 
-    private static HttpApiAuthorizerRequest CreateRequest(string? cpf, string? id)
+    private static HttpApiAuthorizerRequest CreateRequest(string? token, string? id)
     {
         return new HttpApiAuthorizerRequest
         {
-            Headers = cpf is null
+            QueryStringParameters = token is null
                 ? null
-                : new Dictionary<string, string> { ["x-cpf"] = cpf },
+                : new Dictionary<string, string> { ["token"] = token },
             PathParameters = id is null
                 ? null
                 : new Dictionary<string, string> { ["id"] = id }
@@ -115,16 +115,16 @@ public sealed class FunctionTests
     {
         public int CallCount { get; private set; }
         public Guid? LastOrdemServicoId { get; private set; }
-        public Cpf? LastCpf { get; private set; }
+        public string? LastAccessToken { get; private set; }
 
         public Task<bool> HasAccessAsync(
             Guid ordemServicoId,
-            Cpf cpf,
+            string accessToken,
             CancellationToken cancellationToken = default)
         {
             CallCount++;
             LastOrdemServicoId = ordemServicoId;
-            LastCpf = cpf;
+            LastAccessToken = accessToken;
             return Task.FromResult(hasAccess);
         }
     }

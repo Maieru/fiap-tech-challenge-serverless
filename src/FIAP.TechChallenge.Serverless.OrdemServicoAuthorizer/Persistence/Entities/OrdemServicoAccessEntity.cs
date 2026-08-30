@@ -3,6 +3,7 @@ namespace FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Persistence.Entit
 internal sealed class OrdemServicoAccessEntity
 {
     public Guid Id { get; set; }
+    public Guid CodigoAprovacao { get; set; }
     public bool Ativo { get; set; }
     public Guid ClienteId { get; set; }
     public ClienteAccessEntity Cliente { get; set; } = null!;

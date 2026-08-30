@@ -7,7 +7,7 @@ namespace FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer;
 
 public sealed class Function
 {
-    private const string CpfHeaderName = "x-cpf";
+    private const string AccessTokenQueryParameterName = "token";
     private const string OrdemServicoIdPathParameterName = "id";
     private const string DatabaseSecretIdEnvironmentVariable = "DATABASE_SECRET_ID";
     private const string DatabaseSecretKey = "ConnectionStrings__DefaultConnection";
@@ -25,10 +25,8 @@ public sealed class Function
 
     public async Task<HttpApiAuthorizerResponse> FunctionHandler(HttpApiAuthorizerRequest request)
     {
-        if (!TryGetValue(request.Headers, CpfHeaderName, out var rawCpf) || !Cpf.TryCreate(rawCpf, out var cpf))
-        {
+        if (!TryGetValue(request.QueryStringParameters, AccessTokenQueryParameterName, out var accessToken) || !CpfAccessToken.IsWellFormed(accessToken))
             return HttpApiAuthorizerResponse.Deny();
-        }
 
         if (!TryGetValue(request.PathParameters, OrdemServicoIdPathParameterName, out var rawOrdemServicoId) ||
             !Guid.TryParse(rawOrdemServicoId, out var ordemServicoId) ||
@@ -37,7 +35,7 @@ public sealed class Function
             return HttpApiAuthorizerResponse.Deny();
         }
 
-        var hasAccess = await _repository.HasAccessAsync(ordemServicoId, cpf);
+        var hasAccess = await _repository.HasAccessAsync(ordemServicoId, accessToken);
 
         return hasAccess ? HttpApiAuthorizerResponse.Allow(ordemServicoId) : HttpApiAuthorizerResponse.Deny();
     }
@@ -70,17 +68,15 @@ public sealed class Function
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             connectionStringProvider = new FixedConnectionStringProvider(connectionString);
-        }
-        else
-        {
-            var databaseSecretId = Environment.GetEnvironmentVariable(DatabaseSecretIdEnvironmentVariable);
-
-            if (string.IsNullOrWhiteSpace(databaseSecretId))
-                throw new InvalidOperationException($"A variavel de ambiente '{DatabaseSecretIdEnvironmentVariable}' deve ser configurada.");
-
-            connectionStringProvider = new SecretsManagerConnectionStringProvider(new AmazonSecretsManagerClient(), databaseSecretId, DatabaseSecretKey);
+            return new EntityFrameworkOrdemServicoAccessRepository(connectionStringProvider);
         }
 
+        var databaseSecretId = Environment.GetEnvironmentVariable(DatabaseSecretIdEnvironmentVariable);
+
+        if (string.IsNullOrWhiteSpace(databaseSecretId))
+            throw new InvalidOperationException($"A variavel de ambiente '{DatabaseSecretIdEnvironmentVariable}' deve ser configurada.");
+
+        connectionStringProvider = new SecretsManagerConnectionStringProvider(new AmazonSecretsManagerClient(), databaseSecretId, DatabaseSecretKey);
         return new EntityFrameworkOrdemServicoAccessRepository(connectionStringProvider);
     }
 }
