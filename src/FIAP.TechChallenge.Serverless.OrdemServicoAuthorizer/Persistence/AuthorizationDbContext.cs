@@ -19,6 +19,7 @@ internal sealed class AuthorizationDbContext(DbContextOptions<AuthorizationDbCon
         var ordemServico = modelBuilder.Entity<OrdemServicoAccessEntity>();
         _ = ordemServico.ToTable("OrdensServico");
         _ = ordemServico.HasKey(entity => entity.Id);
+        _ = ordemServico.Property(entity => entity.CodigoAprovacao).IsRequired();
         _ = ordemServico.HasQueryFilter(entity => entity.Ativo);
         _ = ordemServico
             .HasOne(entity => entity.Cliente)

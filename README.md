@@ -2,8 +2,9 @@
 
 ## OrdemServicoAuthorizer
 
-Lambda Authorizer para o HTTP API Gateway. A funcao valida se o CPF recebido no
-header `X-CPF` pertence ao cliente vinculado a ordem de servico informada no path
+Lambda Authorizer para o HTTP API Gateway. A funcao valida o token SHA-256
+recebido no query parameter `token`. O token e formado pelo CPF normalizado do
+cliente concatenado ao codigo de aprovacao da ordem de servico informada no path
 parameter `id`.
 
 A consulta usa um `DbContext` minimo do Entity Framework, isolado da aplicacao
@@ -17,8 +18,8 @@ O authorizer utiliza o payload `2.0` do API Gateway:
 
 ```json
 {
-  "headers": {
-    "x-cpf": "529.982.247-25"
+  "queryStringParameters": {
+    "token": "d80e8c958d265c7455badf562f4cbd7914a38bda2698edb1cff74357e9bbc2d6"
   },
   "pathParameters": {
     "id": "9be8b471-bd51-4f44-a0e0-3db12cb342c3"
@@ -37,7 +38,7 @@ Uma requisicao autorizada retorna:
 }
 ```
 
-CPF invalido, OS invalida, OS inexistente ou pertencente a outro CPF retornam
+Token invalido, OS invalida, OS inexistente ou pertencente a outro CPF retornam
 `isAuthorized: false`, sem expor qual validacao falhou.
 
 ### Configuracao
@@ -82,7 +83,8 @@ estagio `infra/serverless`. O repositorio de infraestrutura provisiona:
 - security groups para PostgreSQL e Secrets Manager;
 - endpoint VPC privado do Secrets Manager;
 - Lambda Authorizer HTTP API v2 sem cache;
-- rotas de acompanhamento, aprovacao e cancelamento protegidas por `X-CPF`.
+- rotas de acompanhamento, aprovacao e cancelamento protegidas pelo query
+  parameter `token`.
 
 Antes do primeiro deploy, aplique os estados `aws-resources`, `database` e
 `api-gateway`, seguidos do estado `serverless`. Este repositorio nao executa

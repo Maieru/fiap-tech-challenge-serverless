@@ -4,8 +4,8 @@ namespace FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Contracts;
 
 public sealed class HttpApiAuthorizerRequest
 {
-    [JsonPropertyName("headers")]
-    public Dictionary<string, string>? Headers { get; init; }
+    [JsonPropertyName("queryStringParameters")]
+    public Dictionary<string, string>? QueryStringParameters { get; init; }
 
     [JsonPropertyName("pathParameters")]
     public Dictionary<string, string>? PathParameters { get; init; }

@@ -18,13 +18,21 @@ public sealed class EntityFrameworkOrdemServicoAccessRepository : IOrdemServicoA
         _contextFactory = contextFactory;
     }
 
-    public async Task<bool> HasAccessAsync(Guid ordemServicoId, Cpf cpf, CancellationToken cancellationToken = default)
+    public async Task<bool> HasAccessAsync(Guid ordemServicoId, string accessToken, CancellationToken cancellationToken = default)
     {
         await using var context = await _contextFactory(cancellationToken);
 
-        return await context.OrdensServico.AsNoTracking()
-            .AnyAsync(
-                ordemServico => ordemServico.Id == ordemServicoId && ordemServico.Cliente.Cpf == cpf.Value,
-                cancellationToken);
+        var authorizationData = await context.OrdensServico.AsNoTracking()
+            .Where(ordemServico => ordemServico.Id == ordemServicoId)
+            .Select(ordemServico => new
+            {
+                ordemServico.CodigoAprovacao,
+                ordemServico.Cliente.Cpf
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return authorizationData is not null &&
+            Cpf.TryCreate(authorizationData.Cpf, out var cpf) &&
+            CpfAccessToken.Matches(cpf, authorizationData.CodigoAprovacao, accessToken);
     }
 }

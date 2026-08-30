@@ -10,26 +10,27 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
 {
     private static readonly Guid ClienteId = Guid.Parse("80b8789a-4348-4cf8-aac5-4bd30a96f01e");
     private static readonly Guid OrdemServicoId = Guid.Parse("836f2e61-9d48-43e5-abef-c981cc68d435");
+    private static readonly Guid CodigoAprovacao = Guid.Parse("79ee2120-ab05-4cba-a57d-011d654248dd");
     private const string CpfValue = "52998224725";
 
     [Test]
-    public async Task HasAccessAsync_ShouldReturnTrue_WhenCpfBelongsToActiveOrdemServico()
+    public async Task HasAccessAsync_ShouldReturnTrue_WhenTokenMatchesActiveOrdemServico()
     {
         var fixture = await CreateFixtureAsync();
         var cpf = CreateCpf(CpfValue);
 
-        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, cpf);
+        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, CpfAccessToken.Create(cpf, CodigoAprovacao));
 
         Assert.That(result, Is.True);
     }
 
     [Test]
-    public async Task HasAccessAsync_ShouldReturnFalse_WhenCpfDoesNotBelongToOrdemServico()
+    public async Task HasAccessAsync_ShouldReturnFalse_WhenTokenDoesNotMatchOrdemServico()
     {
         var fixture = await CreateFixtureAsync();
         var cpf = CreateCpf("11144477735");
 
-        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, cpf);
+        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, CpfAccessToken.Create(cpf, CodigoAprovacao));
 
         Assert.That(result, Is.False);
     }
@@ -40,7 +41,7 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
         var fixture = await CreateFixtureAsync(ordemServicoAtiva: false);
         var cpf = CreateCpf(CpfValue);
 
-        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, cpf);
+        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, CpfAccessToken.Create(cpf, CodigoAprovacao));
 
         Assert.That(result, Is.False);
     }
@@ -51,7 +52,7 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
         var fixture = await CreateFixtureAsync(clienteAtivo: false);
         var cpf = CreateCpf(CpfValue);
 
-        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, cpf);
+        var result = await fixture.Repository.HasAccessAsync(OrdemServicoId, CpfAccessToken.Create(cpf, CodigoAprovacao));
 
         Assert.That(result, Is.False);
     }
@@ -84,6 +85,7 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
             var ordemServico = new OrdemServicoAccessEntity
             {
                 Id = OrdemServicoId,
+                CodigoAprovacao = CodigoAprovacao,
                 Ativo = ordemServicoAtiva,
                 ClienteId = ClienteId,
                 Cliente = cliente
