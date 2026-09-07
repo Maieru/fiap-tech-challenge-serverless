@@ -111,6 +111,14 @@ aws lambda update-function-code `
 ```
 
 No GitHub Actions, configure `AUTH_ACTION_ROLE` com o ARN da role
-`fiap-role-github-actions-auth`. Essa role permite somente consultar a funcao e
-atualizar seu codigo. O workflow de inicializacao provisiona a infraestrutura
-primeiro e executa o deploy do codigo em seguida.
+`fiap-role-github-actions-auth`. Essa role permite consultar a funcao, atualizar
+seu codigo e publicar versoes. Aplique primeiro o estagio `bootstrap` do
+repositorio de infraestrutura para conceder `lambda:PublishVersion`.
+O workflow de inicializacao ja executa esse estagio antes do deploy do codigo.
+
+O deploy aguarda a atualizacao do codigo e publica uma versao com o mesmo
+`CodeSha256` retornado pelo upload. Isso automatiza a publicacao antes feita no
+console. O Gateway continua usando o ARN sem qualificador (`$LATEST`); publicar
+uma versao nao troca o destino do authorizer nem comprova a causa de erros de
+autorizacao ou timeout. O Terraform administra a infraestrutura e as permissoes;
+nao deve publicar seu pacote bootstrap como se fosse o codigo da aplicacao.
