@@ -96,7 +96,7 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
             _ = await context.SaveChangesAsync();
         }
 
-        var repository = new EntityFrameworkOrdemServicoAccessRepository(
+        var repository = new OrdemServicoAccessRepository(
             _ => Task.FromResult(CreateContext()));
 
         return new RepositoryFixture(repository);
@@ -110,5 +110,5 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
         return cpf;
     }
 
-    private sealed record RepositoryFixture(EntityFrameworkOrdemServicoAccessRepository Repository);
+    private sealed record RepositoryFixture(OrdemServicoAccessRepository Repository);
 }

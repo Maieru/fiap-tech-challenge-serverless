@@ -68,7 +68,7 @@ public sealed class Function
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             connectionStringProvider = new FixedConnectionStringProvider(connectionString);
-            return new EntityFrameworkOrdemServicoAccessRepository(connectionStringProvider);
+            return new OrdemServicoAccessRepository(connectionStringProvider);
         }
 
         var databaseSecretId = Environment.GetEnvironmentVariable(DatabaseSecretIdEnvironmentVariable);
@@ -77,6 +77,6 @@ public sealed class Function
             throw new InvalidOperationException($"A variavel de ambiente '{DatabaseSecretIdEnvironmentVariable}' deve ser configurada.");
 
         connectionStringProvider = new SecretsManagerConnectionStringProvider(new AmazonSecretsManagerClient(), databaseSecretId, DatabaseSecretKey);
-        return new EntityFrameworkOrdemServicoAccessRepository(connectionStringProvider);
+        return new OrdemServicoAccessRepository(connectionStringProvider);
     }
 }
