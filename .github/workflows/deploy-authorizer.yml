@@ -66,17 +66,39 @@ jobs:
           role-to-assume: ${{ secrets.AUTH_ACTION_ROLE }}
 
       - name: Atualizar codigo da Lambda
+        id: update-code
         run: |
-          aws lambda update-function-code \
+          code_sha=$(aws lambda update-function-code \
             --function-name "${FUNCTION_NAME}" \
             --zip-file "fileb://${PACKAGE_PATH}" \
-            --no-cli-pager
+            --query CodeSha256 \
+            --output text \
+            --no-cli-pager)
+
+          echo "code_sha=${code_sha}" >> "$GITHUB_OUTPUT"
 
           aws lambda wait function-updated \
             --function-name "${FUNCTION_NAME}"
 
+      - name: Publicar versao da Lambda
+        id: publish-version
+        env:
+          CODE_SHA: ${{ steps.update-code.outputs.code_sha }}
+        run: |
+          version=$(aws lambda publish-version \
+            --function-name "${FUNCTION_NAME}" \
+            --code-sha256 "${CODE_SHA}" \
+            --query Version \
+            --output text \
+            --no-cli-pager)
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - name: Exibir versao implantada
+        env:
+          PUBLISHED_VERSION: ${{ steps.publish-version.outputs.version }}
         run: |
           aws lambda get-function-configuration \
             --function-name "${FUNCTION_NAME}" \
-            --query '{FunctionName:FunctionName,LastModified:LastModified,CodeSha256:CodeSha256,State:State}'
+            --qualifier "${PUBLISHED_VERSION}" \
+            --query '{FunctionName:FunctionName,Version:Version,LastModified:LastModified,CodeSha256:CodeSha256,State:State}'
