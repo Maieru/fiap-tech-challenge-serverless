@@ -90,7 +90,7 @@ Antes do primeiro deploy, aplique os estados `aws-resources`, `database` e
 `api-gateway`, seguidos do estado `serverless`. Este repositorio nao executa
 Terraform: ele apenas compila, testa e atualiza o codigo da funcao ja existente.
 
-Para deploy local:
+Para deploy local, execute na raiz deste repositorio:
 
 ```powershell
 dotnet test FiapTechChallengeServerless.slnx --configuration Release
@@ -108,6 +108,9 @@ Compress-Archive `
 aws lambda update-function-code `
   --function-name fiap-ordem-servico-authorizer `
   --zip-file fileb://artifacts/ordem-servico-authorizer.zip
+
+aws lambda wait function-updated-v2 `
+  --function-name fiap-ordem-servico-authorizer
 ```
 
 No GitHub Actions, configure `AUTH_ACTION_ROLE` com o ARN da role
@@ -116,7 +119,7 @@ seu codigo e publicar versoes. Aplique primeiro o estagio `bootstrap` do
 repositorio de infraestrutura para conceder `lambda:PublishVersion`.
 O workflow de inicializacao ja executa esse estagio antes do deploy do codigo.
 
-O deploy aguarda a atualizacao do codigo e publica uma versao com o mesmo
+O deploy pelo GitHub Actions aguarda a atualizacao do codigo e publica uma versao com o mesmo
 `CodeSha256` retornado pelo upload. Isso automatiza a publicacao antes feita no
 console. O Gateway continua usando o ARN sem qualificador (`$LATEST`); publicar
 uma versao nao troca o destino do authorizer nem comprova a causa de erros de
