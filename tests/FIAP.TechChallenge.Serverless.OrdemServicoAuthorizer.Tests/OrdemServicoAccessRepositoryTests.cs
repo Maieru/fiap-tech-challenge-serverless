@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Tests;
 
-public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
+public sealed class OrdemServicoAccessRepositoryTests
 {
     private static readonly Guid ClienteId = Guid.Parse("80b8789a-4348-4cf8-aac5-4bd30a96f01e");
     private static readonly Guid OrdemServicoId = Guid.Parse("836f2e61-9d48-43e5-abef-c981cc68d435");
@@ -96,7 +96,7 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
             _ = await context.SaveChangesAsync();
         }
 
-        var repository = new EntityFrameworkOrdemServicoAccessRepository(
+        var repository = new OrdemServicoAccessRepository(
             _ => Task.FromResult(CreateContext()));
 
         return new RepositoryFixture(repository);
@@ -110,5 +110,5 @@ public sealed class EntityFrameworkOrdemServicoAccessRepositoryTests
         return cpf;
     }
 
-    private sealed record RepositoryFixture(EntityFrameworkOrdemServicoAccessRepository Repository);
+    private sealed record RepositoryFixture(OrdemServicoAccessRepository Repository);
 }

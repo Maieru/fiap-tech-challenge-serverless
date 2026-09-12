@@ -3,17 +3,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Persistence;
 
-public sealed class EntityFrameworkOrdemServicoAccessRepository : IOrdemServicoAccessRepository
+public sealed class OrdemServicoAccessRepository : IOrdemServicoAccessRepository
 {
     private readonly Func<CancellationToken, Task<AuthorizationDbContext>> _contextFactory;
 
-    public EntityFrameworkOrdemServicoAccessRepository(IConnectionStringProvider connectionStringProvider)
+    public OrdemServicoAccessRepository(IConnectionStringProvider connectionStringProvider)
     {
         var contextFactory = new AuthorizationDbContextFactory(connectionStringProvider);
         _contextFactory = contextFactory.CreateAsync;
     }
 
-    internal EntityFrameworkOrdemServicoAccessRepository(Func<CancellationToken, Task<AuthorizationDbContext>> contextFactory)
+    internal OrdemServicoAccessRepository(Func<CancellationToken, Task<AuthorizationDbContext>> contextFactory)
     {
         _contextFactory = contextFactory;
     }
