@@ -114,3 +114,29 @@ No GitHub Actions, configure `AUTH_ACTION_ROLE` com o ARN da role
 `fiap-role-github-actions-auth`. Essa role permite somente consultar a funcao e
 atualizar seu codigo. O workflow de inicializacao provisiona a infraestrutura
 primeiro e executa o deploy do codigo em seguida.
+
+
+## Tecnologias e arquitetura
+
+.NET 10, AWS Lambda, API Gateway HTTP API v2, EF Core/Npgsql, Secrets Manager e GitHub Actions/OIDC. A publicação é em ZIP; Dockerfile não se aplica ao empacotamento atual.
+
+```mermaid
+flowchart LR
+    Cliente["Cliente com id da ordem e token"] --> Gateway["API Gateway"]
+    Gateway --> Lambda["Lambda Authorizer .NET"]
+    Lambda -->|"consulta ordem e cliente ativos"| RDS[("PostgreSQL")]
+    Secret["Secrets Manager"] --> Lambda
+    Lambda -->|"isAuthorized"| Gateway
+    Gateway -->|"se autorizado"| API["API no EKS via VPC Link e ALB"]
+    Actions["GitHub Actions"] -->|"build, testes e ZIP"| Lambda
+```
+
+A função não é um servidor HTTP autônomo: localmente, execute os testes acima, que exercitam o contrato do evento. O contrato de entrada e saída do authorizer está neste README. As APIs consumidoras oferecem [OpenAPI local](http://localhost:8080/openapi/v1.json) e [Scalar local](http://localhost:8080/scalar/v1) com a aplicação em Development.
+
+## Escopo alinhado da Lambda
+
+Conforme o alinhamento do projeto, a Lambda valida as requisições de clientes às rotas de acompanhamento, aprovação e cancelamento. Ela recebe o identificador da ordem e o token SHA-256, consulta ordem e cliente ativos, valida o CPF armazenado e compara o token com o valor esperado.
+
+A função retorna `isAuthorized` para o API Gateway permitir ou negar o encaminhamento à API, sem cache de autorização. O JWT administrativo é emitido pela aplicação principal com login e senha. Consulte os [diagramas de sequência](https://github.com/Maieru/fiap-tech-challenge/blob/main/docs/arquitetura/sequencias.md).
+
+O workflow atual faz build, testes e deploy, mas é disparado manualmente ou por outro workflow. Deploy automático de homologação/produção e regras de proteção de branches ainda precisam ser implementados ou comprovados.
