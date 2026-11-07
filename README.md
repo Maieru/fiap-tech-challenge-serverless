@@ -1,5 +1,7 @@
 # FIAP Tech Challenge - Serverless
 
+> Componente legado retirado do ciclo AWS dos microsserviços. O workflow de deploy foi removido; autenticação administrativa e JWT pertencem ao OS. Para retirada remota, usar as versões antigas indicadas no [guia operacional](https://github.com/Maieru/fiap-tech-challenge/blob/main/docs/operacao/plataforma-aws.md). O código permanece como referência histórica.
+
 ## OrdemServicoAuthorizer
 
 Lambda Authorizer para o HTTP API Gateway. A funcao valida o token SHA-256
