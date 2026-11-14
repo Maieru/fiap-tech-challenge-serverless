@@ -1,22 +1,10 @@
-# FIAP Tech Challenge - Serverless
+# FIAP Tech Challenge — Serverless
 
-> Componente legado retirado do ciclo AWS dos microsserviços. O workflow de deploy foi removido; autenticação administrativa e JWT pertencem ao OS. Para retirada remota, usar as versões antigas indicadas no [guia operacional](https://github.com/Maieru/fiap-tech-challenge/blob/main/docs/operacao/plataforma-aws.md). O código permanece como referência histórica.
+Autorizador Lambda .NET 10 para HTTP API Gateway, com token por CPF e código de aprovação. É um componente independente: o ciclo AWS de OS/Execution/Billing não o publica. A autenticação administrativa e os links privados dos microsserviços são validados pelo OS.
 
-## OrdemServicoAuthorizer
+## Contrato e dados
 
-Lambda Authorizer para o HTTP API Gateway. A funcao valida o token SHA-256
-recebido no query parameter `token`. O token e formado pelo CPF normalizado do
-cliente concatenado ao codigo de aprovacao da ordem de servico informada no path
-parameter `id`.
-
-A consulta usa um `DbContext` minimo do Entity Framework, isolado da aplicacao
-principal, com apenas as entidades de leitura de cliente e ordem de servico. O
-CPF tambem e representado por um value object local e nao ha referencias para os
-projetos ou pacotes internos da aplicacao.
-
-### Contrato de entrada
-
-O authorizer utiliza o payload `2.0` do API Gateway:
+O handler aceita o payload 2.0 do HTTP API Gateway:
 
 ```json
 {
@@ -29,101 +17,84 @@ O authorizer utiliza o payload `2.0` do API Gateway:
 }
 ```
 
-Uma requisicao autorizada retorna:
+O token esperado é o SHA-256, representado em 64 caracteres hexadecimais, do CPF normalizado concatenado ao `CodigoAprovacao` da ordem em formato UUID com hífens. O exemplo ilustra somente o formato; a autorização depende dos dados do banco.
+
+Uma autorização retorna:
 
 ```json
 {
   "isAuthorized": true,
-  "context": {
-    "ordemServicoId": "9be8b471-bd51-4f44-a0e0-3db12cb342c3"
-  }
+  "context": { "ordemServicoId": "9be8b471-bd51-4f44-a0e0-3db12cb342c3" }
 }
 ```
 
-Token invalido, OS invalida, OS inexistente ou pertencente a outro CPF retornam
-`isAuthorized: false`, sem expor qual validacao falhou.
+Ausência/formato inválido de token ou ID, ordem inexistente/inativa ou token sem correspondência retornam `isAuthorized: false`. Falhas de configuração, acesso ao Secrets Manager ou banco são erros operacionais e precisam ser diagnosticadas; não equivalem a token inválido.
 
-### Configuracao
+A leitura EF espera tabelas `Clientes` e `OrdensServico` com os campos mapeados no [AuthorizationDbContext](src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer/Persistence/AuthorizationDbContext.cs), incluindo `Cpf`, `Ativo`, `ClienteId` e `CodigoAprovacao`. Esse contrato não corresponde ao schema atual do OS; não aponte o componente para o banco OS sem uma adaptação explícita. A função não cria schema nem aplica migrations.
 
-Em ambiente AWS, configure `DATABASE_SECRET_ID` com o nome ou ARN do segredo. O
-JSON armazenado no Secrets Manager deve conter a chave
-`ConnectionStrings__DefaultConnection`.
+## Pré-requisitos e configuração
 
-Para desenvolvimento local, a variavel `ConnectionStrings__DefaultConnection`
-pode ser informada diretamente e tem precedencia sobre o Secrets Manager.
+.NET SDK 10 e acesso NuGet bastam para build e testes atuais. Os exemplos usam PowerShell 7. AWS CLI e permissões AWS são necessários somente para operação remota.
 
-### Compilar e testar
+| Variável | Uso |
+| --- | --- |
+| `ConnectionStrings__DefaultConnection` | Conexão PostgreSQL direta; tem precedência quando não vazia |
+| `DATABASE_SECRET_ID` | Nome ou ARN do segredo usado quando não há conexão direta |
+| `AWS_REGION` | Região para os clientes AWS quando não fornecida pelo runtime; os defaults de empacotamento usam us-east-1 |
 
-```powershell
-dotnet build FiapTechChallengeServerless.slnx
-dotnet test FiapTechChallengeServerless.slnx
-```
+O segredo precisa conter `ConnectionStrings__DefaultConnection` em JSON. A role da função deve poder ler esse segredo e alcançar o banco; o código usa a cadeia padrão de credenciais AWS. Não versione conexão, token ou dados pessoais.
 
-### Empacotar
+## Build e testes
 
-Com a ferramenta `Amazon.Lambda.Tools` instalada:
+Na raiz:
 
 ```powershell
-dotnet lambda package `
-  --project-location src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer `
-  --output-package artifacts/ordem-servico-authorizer.zip
+dotnet restore FiapTechChallengeServerless.slnx
+dotnet build FiapTechChallengeServerless.slnx -c Release --no-restore
+dotnet test FiapTechChallengeServerless.slnx -c Release --no-build --no-restore
 ```
 
-O handler configurado e:
+Os testes verificam CPF/token, handler e repositório com provedor EF InMemory. Não precisam de banco AWS ou Docker e não comprovam SQL PostgreSQL, permissões IAM ou integração com API Gateway. Os projetos ficam em `src` e `tests`.
+
+## Empacotamento
+
+O handler é:
 
 ```text
 Ftc.Authorizer::FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.Function::FunctionHandler
 ```
 
-## Infraestrutura AWS
-
-O Terraform e seu estado ficam no repositorio `fiap-tech-challenge-infra`, no
-estagio `infra/serverless`. O repositorio de infraestrutura provisiona:
-
-- Lambda .NET 10 nas subnets privadas;
-- role de execucao e acesso somente ao segredo do banco;
-- security groups para PostgreSQL e Secrets Manager;
-- endpoint VPC privado do Secrets Manager;
-- Lambda Authorizer HTTP API v2 sem cache;
-- rotas de acompanhamento, aprovacao e cancelamento protegidas pelo query
-  parameter `token`.
-
-Antes do primeiro deploy, aplique os estados `aws-resources`, `database` e
-`api-gateway`, seguidos do estado `serverless`. Este repositorio nao executa
-Terraform: ele apenas compila, testa e atualiza o codigo da funcao ja existente.
-
-Para deploy local, execute na raiz deste repositorio:
+O [arquivo de defaults](src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer/aws-lambda-tools-defaults.json) define runtime `dotnet10`, Release e região us-east-1. Para usar o comando específico de Lambda, instale `Amazon.Lambda.Tools` em uma versão compatível com seu SDK e execute:
 
 ```powershell
-dotnet test FiapTechChallengeServerless.slnx --configuration Release
-
-dotnet publish `
-  src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.csproj `
-  --configuration Release `
-  --output artifacts/publish
-
-Compress-Archive `
-  -Path artifacts/publish/* `
-  -DestinationPath artifacts/ordem-servico-authorizer.zip `
-  -Force
-
-aws lambda update-function-code `
-  --function-name fiap-ordem-servico-authorizer `
-  --zip-file fileb://artifacts/ordem-servico-authorizer.zip
-
-aws lambda wait function-updated-v2 `
-  --function-name fiap-ordem-servico-authorizer
+dotnet lambda package --project-location src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer --output-package artifacts/ordem-servico-authorizer.zip
 ```
 
-No GitHub Actions, configure `AUTH_ACTION_ROLE` com o ARN da role
-`fiap-role-github-actions-auth`. Essa role permite consultar a funcao, atualizar
-seu codigo e publicar versoes. Aplique primeiro o estagio `bootstrap` do
-repositorio de infraestrutura para conceder `lambda:PublishVersion`.
-O workflow de inicializacao ja executa esse estagio antes do deploy do codigo.
+Como alternativa, publique o projeto e compacte o conteúdo, sem uma pasta pai dentro do ZIP:
 
-O deploy pelo GitHub Actions aguarda a atualizacao do codigo e publica uma versao com o mesmo
-`CodeSha256` retornado pelo upload. Isso automatiza a publicacao antes feita no
-console. O Gateway continua usando o ARN sem qualificador (`$LATEST`); publicar
-uma versao nao troca o destino do authorizer nem comprova a causa de erros de
-autorizacao ou timeout. O Terraform administra a infraestrutura e as permissoes;
-nao deve publicar seu pacote bootstrap como se fosse o codigo da aplicacao.
+```powershell
+dotnet publish src/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer/FIAP.TechChallenge.Serverless.OrdemServicoAuthorizer.csproj -c Release -o artifacts/publish
+Compress-Archive -Path artifacts/publish/* -DestinationPath artifacts/ordem-servico-authorizer.zip -Force
+```
+
+Use um diretório de publicação limpo e configure runtime, arquitetura e handler de forma compatível no destino. `artifacts` é gerado localmente e ignorado pelo Git.
+
+## Operação AWS
+
+Não há workflow de deploy neste repositório. `infra/serverless` no repositório Infra contém declarações do componente, mas não é estágio aceito pelo ciclo atual dos microsserviços. Criar função, roles, rede, schema e rotas exige um procedimento independente e revisão de compatibilidade; o [guia central](https://github.com/Maieru/fiap-tech-challenge/blob/main/docs/operacao/plataforma-aws.md) descreve o ciclo das três APIs.
+
+Somente para uma função já provisionada e compatível, o upload manual é:
+
+```powershell
+aws lambda update-function-code --function-name '<nome-da-funcao>' --zip-file fileb://artifacts/ordem-servico-authorizer.zip --region us-east-1
+aws lambda wait function-updated-v2 --function-name '<nome-da-funcao>' --region us-east-1
+```
+
+Atualizar código não configura handler, variáveis, rede, authorizer ou rotas. Publicar uma versão também não muda automaticamente aliases ou o destino configurado no Gateway.
+
+## Diagnóstico
+
+- Erro por `DATABASE_SECRET_ID` ausente: forneça conexão direta ou o identificador do segredo.
+- `AccessDenied`: confira credenciais, role e ARN do segredo; não exponha o JSON do segredo no diagnóstico.
+- Erro SQL ou timeout: confira schema, conexão, TLS, DNS e alcance de rede.
+- `isAuthorized: false`: confira ID, registros ativos e o token correspondente, sem registrar CPF ou token em logs.
